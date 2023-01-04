@@ -1,0 +1,21 @@
+{
+  "name": "transparent",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "@apollo/client": "^3.7.3",
+    "cookie-parser": "~1.4.4",
+    "cors": "*",
+    "debug": "~2.6.9",
+    "dotenv": "*",
+    "express": "^4.18.2",
+    "https": "^1.0.0",
+    "morgan": "~1.9.1",
+    "node-fetch": "^2.6.1",
+    "uuid": "^9.0.0"
+  }
+}
