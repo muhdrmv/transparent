@@ -158,6 +158,6 @@
      "sessionID": "muhammad",
      "clientIp": "192.168.1.123",
      "deviceType": "Smart card",
-     "deviceID": 1,
+     "deviceID": 1, 
      "deviceName": "SCARD"
 }
