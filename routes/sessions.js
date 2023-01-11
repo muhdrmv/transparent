@@ -5,7 +5,7 @@ var rdp_prepare = require('../controllers/rdp-prepare');
 const { v1 : uuidv1, v1 } = require('uuid');
 const { exec } = require('child_process');
 
-var {queryWhere, queryRaw, deleteWhere, insertOne} = require('../db/graphql');
+var {queryWhere, updatePk, queryRaw, deleteWhere, insertOne} = require('../db/graphql');
 
 let config = {
   hasuraAdminSecret: process.env.HASURA_ADMIN_SECRET,
@@ -26,10 +26,14 @@ let check_repetitive_port = async (port) => {
   else true;
 }
 
-let insert_session = async (sessionInput) => {
-  const session = await insertOne(config, 'sessions', sessionInput);
-  if(!session){
-    return;  
+const updateSessionStatus = async (session, status) => {
+
+  try {
+    const dateNow = new Date().toISOString();
+    await updatePk(config, 'sessions', session.id, {status, closed_at: dateNow});
+    return true;
+  } catch (error) {
+    return false
   }
 }
 
@@ -42,9 +46,12 @@ router.get('/creating-session', async function(req, res, next) {
 
 
   let id = v1(uuidv1)
-      pam_session_id  = "7b78eab6-46f6-45e6-b9b6-3bdfd2260f5b",
+      // pamSessionId  = v1(uuidv1),
+      pamSessionId  = "90b79930-9186-11ed-9c3a-5f1404e4f8b1",
       user_id = "7b78eab6-46f6-45e6-b9b6-3bdfd2260f5b",
-      ip = "192.168.1.130";
+      ip = "192.168.1.120",
+      username = "mv",
+      password = null
 
   let port_available = false;
   let port = null;
@@ -57,7 +64,7 @@ router.get('/creating-session', async function(req, res, next) {
 
   const sessionInput = {
     id,
-    pam_session_id ,
+    pam_session_id: pamSessionId ,
     user_id,
     ip,
     port,
@@ -65,19 +72,37 @@ router.get('/creating-session', async function(req, res, next) {
     meta: {}
   };
 
-  insert_session(sessionInput)
+  let insert_session_result = await insertOne(config, 'sessions', sessionInput);
+  if(!insert_session_result) return;
 
-  exec(`docker run -d --name ${pam_session_id} -v /root/rjpn/${process.env.TRANSPARENT_VERSION_FOLDER}/pyrdp_output:/home/pyrdp/pyrdp_output -p ${port}:3389 ${process.env.TRANSPARENT} pyrdp-mitm.py -si ${pam_session_id} ${ip}`, (err, stdout, stderr) => {
-    if (err) return;
-  });
+  if(!username || !password){
+    
+    exec(`docker run -d --name ${pamSessionId} -v /root/rjpn/${process.env.TRANSPARENT_VERSION_FOLDER}/pyrdp_output:/home/pyrdp/pyrdp_output -p ${port}:3389 ${process.env.TRANSPARENT} pyrdp-mitm.py -si ${pamSessionId} ${ip}`, (err, stdout, stderr) => {
+      if (err||stderr) {
+        console.log(err, stderr);
+        return;
+      }
+    });
+  }else{
 
-  let str = await rdp_prepare(process.env.IP, port)
+    exec(`docker run -d --name ${pamSessionId} -v /root/rjpn/${process.env.TRANSPARENT_VERSION_FOLDER}/pyrdp_output:/home/pyrdp/pyrdp_output -p ${port}:3389 ${process.env.TRANSPARENT} pyrdp-mitm.py -si ${pamSessionId} -u ${username} -p ${password} ${ip}`, (err, stdout, stderr) => {
+      if (err||stderr) {
+        console.log(err, stderr);
+        return;
+      }
+    });
+  }
+  
+  let str = await rdp_prepare(process.env.IP_ADDRESS, port)
 
-  let filname = `${ip}_${port}_${pam_session_id}.rdp`;
+  let filname = `${ip}_${port}_${pamSessionId}.rdp`;
 
   fs.writeFile(`${process.env.RDP_CONNECTION_PATH}/${filname}`, str, (err) => {
 
-    if (err) throw err;
+    if (err) {
+      console.log(err);
+      return;
+    }
     res.download(`${process.env.RDP_CONNECTION_PATH}/${filname}`)
   });
 
@@ -88,16 +113,27 @@ router.get('/terminate-session', async function(req, res, next) {
   // let {
   //   pam_session_uuid
   // } = req.body; 
-  // if(!pam_session_id) return;
+  // if(!pamSessionId) return;
 
-  let pam_session_id = "muhdrmv";
+  let pamSessionId = "90b79930-9186-11ed-9c3a-5f1404e4f8b1";
 
-  exec(`docker rm -f ${pam_session_id}`, (err, stdout, stderr) => {
 
-    if (err) return err;
-    if(stdout != pam_session_id) return;
+  const session = await queryWhere(config, 'sessions',
+          {pam_session_id : {_eq: pamSessionId}},
+          ['id', 'status']);
+  ;
+  let updateResult = await updatePk(config, 'sessions', session?.[0]?.id, {status: "closed", closed_at: new Date().toISOString()})
+  if(updateResult?.errors){
+    return;
+  }
+ 
+  exec(`docker rm -f ${pamSessionId}`, (err, stdout, stderr) => {
 
-    // Action:  update session id (Live => closed)
+    if (err||stderr) {
+      console.log(err, stderr);
+      return;
+    }
+    console.log(stdout);
   });  
 });
 
@@ -106,20 +142,23 @@ router.get('/export-keystrokes', async function(req, res, next) {
   // let {
   //   pam_session_uuid
   // } = req.body; 
-  // if(!pam_session_id) return;
+  // if(!pamSessionId) return;
 
-  exec(`docker run -v /root/rjpn/${process.env.TRANSPARENT_VERSION_FOLDER}/pyrdp_output:/home/pyrdp/pyrdp_output ${process.env.TRANSPARENT} pyrdp-player.py --headless pyrdp_output/replays/${pam_session_id}.pyrdp`, (err, stdout, stderr) => {
+  exec(`docker run -v /root/rjpn/${process.env.TRANSPARENT_VERSION_FOLDER}/pyrdp_output:/home/pyrdp/pyrdp_output ${process.env.TRANSPARENT} pyrdp-player.py --headless pyrdp_output/replays/${pamSessionId}.pyrdp`, (err, stdout, stderr) => {
 
-    if (err) return;
+    if (err||stderr) {
+      console.log(err, stderr);
+      return;
+    }
+
     console.log(stdout);
 
-    fs.writeFile(`${process.env.KEYSTROKES_PATH}/${pam_session_id}.txt`, stdout, (err) => {
+    fs.writeFile(`${process.env.KEYSTROKES_PATH}/${pamSessionId}.txt`, stdout, (err) => {
       if (err) throw err;
-      res.download(`${process.env.KEYSTROKES_PATH}/${pam_session_id}.txt`)
+      res.download(`${process.env.KEYSTROKES_PATH}/${pamSessionId}.txt`)
     });
 
   });
-
 });
 
 router.get('/export-video', async function(req, res, next) {
@@ -127,9 +166,9 @@ router.get('/export-video', async function(req, res, next) {
   // let {
   //   pam_session_uuid
   // } = req.body; 
-  // if(!pam_session_id) return;
+  // if(!pamSessionId) return;
 
-  exec(`docker run -v /root/rjpn/${process.env.TRANSPARENT_VERSION_FOLDER}/pyrdp_output:/home/pyrdp/pyrdp_output ${process.env.TRANSPARENT} pyrdp-player.py --headless pyrdp_output/replays/${pam_session_id}.pyrdp`, (err, stdout, stderr) => {
+  exec(`docker run -v /root/rjpn/${process.env.TRANSPARENT_VERSION_FOLDER}/pyrdp_output:/home/pyrdp/pyrdp_output ${process.env.TRANSPARENT} pyrdp-player.py --headless pyrdp_output/replays/${pamSessionId}.pyrdp`, (err, stdout, stderr) => {
 
     if (err) return;
     console.log(stdout);
