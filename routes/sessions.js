@@ -77,7 +77,7 @@ router.get('/creating-session', async function(req, res, next) {
 
   if(!username || !password){
     
-    exec(`docker run -d --name ${pamSessionId} -v /root/rjpn/${process.env.TRANSPARENT_VERSION_FOLDER}/pyrdp_output:/home/pyrdp/pyrdp_output -p ${port}:3389 ${process.env.TRANSPARENT} pyrdp-mitm.py -si ${pamSessionId} ${ip}`, (err, stdout, stderr) => {
+    exec(`docker run -d --name ${pamSessionId} -v /root/rjpn/${process.env.TRANSPARENT_VERSION_FOLDER}/pyrdp_output:/home/pyrdp/pyrdp_output  -v /store:/store -p ${port}:3389 ${process.env.TRANSPARENT} pyrdp-mitm.py -si ${pamSessionId} ${ip}`, (err, stdout, stderr) => {
       if (err||stderr) {
         console.log(err, stderr);
         return;
@@ -85,7 +85,7 @@ router.get('/creating-session', async function(req, res, next) {
     });
   }else{
 
-    exec(`docker run -d --name ${pamSessionId} -v /root/rjpn/${process.env.TRANSPARENT_VERSION_FOLDER}/pyrdp_output:/home/pyrdp/pyrdp_output -p ${port}:3389 ${process.env.TRANSPARENT} pyrdp-mitm.py -si ${pamSessionId} -u ${username} -p ${password} ${ip}`, (err, stdout, stderr) => {
+    exec(`docker run -d --name ${pamSessionId} -v /root/rjpn/${process.env.TRANSPARENT_VERSION_FOLDER}/pyrdp_output:/home/pyrdp/pyrdp_output  -v /store:/store -p ${port}:3389 ${process.env.TRANSPARENT} pyrdp-mitm.py -si ${pamSessionId} -u ${username} -p ${password} ${ip}`, (err, stdout, stderr) => {
       if (err||stderr) {
         console.log(err, stderr);
         return;
@@ -134,7 +134,8 @@ router.get('/terminate-session', async function(req, res, next) {
       return;
     }
     console.log(stdout);
-  });  
+  });
+  res.send("ok")  
 });
 
 router.get('/export-keystrokes', async function(req, res, next) {
@@ -144,16 +145,18 @@ router.get('/export-keystrokes', async function(req, res, next) {
   // } = req.body; 
   // if(!pamSessionId) return;
 
+  let pamSessionId = "90b79930-9186-11ed-9c3a-5f1404e4f8b1";
   exec(`docker run -v /root/rjpn/${process.env.TRANSPARENT_VERSION_FOLDER}/pyrdp_output:/home/pyrdp/pyrdp_output ${process.env.TRANSPARENT} pyrdp-player.py --headless pyrdp_output/replays/${pamSessionId}.pyrdp`, (err, stdout, stderr) => {
 
-    if (err||stderr) {
-      console.log(err, stderr);
+    if (err) {
+      console.log(err);
       return;
     }
 
-    console.log(stdout);
+    let array = stdout.split("<Windows released>"); 
+    let newOutput = array[1]?.replaceAll("pyrdp", "RAJA")
 
-    fs.writeFile(`${process.env.KEYSTROKES_PATH}/${pamSessionId}.txt`, stdout, (err) => {
+    fs.writeFile(`${process.env.KEYSTROKES_PATH}/${pamSessionId}.txt`, newOutput, (err) => {
       if (err) throw err;
       res.download(`${process.env.KEYSTROKES_PATH}/${pamSessionId}.txt`)
     });
