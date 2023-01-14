@@ -1,0 +1,19 @@
+{
+    "data": [
+        {
+            "action": "Server disconnected",
+            "sessionId": "90b79930-6000-11ed-9c3a-5f1404e4f8b1",
+            "time": 1673445080.087925
+        },
+        {
+            "action": "Server disconnected",
+            "sessionId": "90b79930-7000-11ed-9c3a-5f1404e4f8b1",
+            "time": 1673445550.970145
+        },
+        {
+            "action": "Server disconnected",
+            "sessionId": "90b79930-8000-11ed-9c3a-5f1404e4f8b1",
+            "time": 1673445670.631234
+        }
+    ]
+}

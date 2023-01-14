@@ -1,7 +1,7 @@
 var express = require('express');
 var cookieParser = require('cookie-parser');
-const PORT = process.env.PORT || 3030;
-
+var PORT = process.env.PORT || 3030;
+var appInit = require('./controllers/appInit')
 var app = express();
 
 app.use(express.json());
@@ -13,7 +13,7 @@ app.use(function (req, res, next) {
 });
 
 if (process.env.ALLOW_CORS) {
-    app.use(cors());
+    // app.use(cors());
     console.log('CORS Allowed')
 }
 
@@ -30,5 +30,7 @@ app.listen(PORT, (err) => {
     }
     console.log("Server is run successfully. PORT : ", PORT)
 })
+
+appInit()
 
 module.exports = app;
